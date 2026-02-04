@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flashcard Trainer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Localhost Trainer</p>
+          <h1>Flashcard Flight Deck</h1>
+          <p class="subtitle">Fast recall training with spaced repetition and smart modes.</p>
+        </div>
+        <div class="top-actions">
+          <button class="ghost" id="loadSample">Load sample</button>
+          <button class="ghost" id="resetProgress">Reset progress</button>
+        </div>
+      </header>
+
+      <section class="panel" id="importPanel">
+        <div class="panel-title">Import Questions</div>
+        <div class="import-grid">
+          <div class="import-card">
+            <h3>Upload JSON</h3>
+            <p>Accepts a single question object or an array of them.</p>
+            <input type="file" id="fileInput" accept="application/json" />
+            <button id="importFile" class="primary">Import file</button>
+          </div>
+          <div class="import-card">
+            <h3>Paste JSON</h3>
+            <p>Paste the question JSON and load instantly.</p>
+            <textarea id="jsonInput" spellcheck="false"></textarea>
+            <button id="importPaste" class="primary">Import pasted JSON</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="trainerPanel">
+        <div class="controls">
+          <div>
+            <label for="modeSelect">Mode</label>
+            <select id="modeSelect">
+              <option value="random">Random</option>
+              <option value="module">Categories</option>
+              <option value="weak">Focus Weak</option>
+              <option value="review">Review Due</option>
+              <option value="sprint">Sprint 60s</option>
+            </select>
+          </div>
+          <div>
+            <label for="moduleSelect">Module</label>
+            <select id="moduleSelect"></select>
+          </div>
+          <div>
+            <label>Attempt Mode</label>
+            <div class="segmented">
+              <button data-attempt="reveal" class="segmented-btn">Reveal after miss</button>
+              <button data-attempt="second" class="segmented-btn">Second chance</button>
+            </div>
+          </div>
+          <div>
+            <label>Options</label>
+            <div class="toggle-row">
+              <label class="toggle">
+                <input type="checkbox" id="shuffleToggle" checked />
+                <span>Shuffle answers</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="autoNextToggle" />
+                <span>Auto-next on correct</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div>
+            <p class="stat-label">Questions</p>
+            <p class="stat-value" id="statTotal">0</p>
+          </div>
+          <div>
+            <p class="stat-label">Due now</p>
+            <p class="stat-value" id="statDue">0</p>
+          </div>
+          <div>
+            <p class="stat-label">Accuracy (mode)</p>
+            <p class="stat-value" id="statAccuracy">0%</p>
+          </div>
+          <div>
+            <p class="stat-label">Sprint time</p>
+            <p class="stat-value" id="statSprint">--:--</p>
+          </div>
+        </div>
+
+        <div class="card" id="card">
+          <div class="card-header">
+            <span class="pill" id="modulePill">Module</span>
+            <span class="counter" id="counter">0 / 0</span>
+          </div>
+          <h2 id="questionText">Import questions to begin.</h2>
+          <div class="answers" id="answers"></div>
+          <div class="feedback" id="feedback"></div>
+          <div class="card-footer">
+            <div class="progress">
+              <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <button id="nextBtn" class="primary">Next</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
