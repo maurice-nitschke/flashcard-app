@@ -19,10 +19,11 @@
         <div>
           <p class="eyebrow">Localhost Trainer</p>
           <h1>Learning Dashboard</h1>
-          <p class="subtitle">Progress trends, performance by module, and session history.</p>
+          <p class="subtitle">Progress trends, pace improvements, and exam readiness in one view.</p>
         </div>
         <div class="top-actions">
           <a class="ghost" href="index.html">Training view</a>
+          <a class="ghost" href="exam.html">Mock exam</a>
           <button class="ghost" id="loadSample">Load sample</button>
           <button class="ghost" id="resetProgress">Reset progress</button>
         </div>
@@ -91,6 +92,45 @@
               <button class="ghost" id="clearHistory">Clear history</button>
             </div>
             <div id="historyList" class="history-list"></div>
+          </div>
+        </div>
+        <div class="exam-prep">
+          <div class="history-header">
+            <p class="stat-label">Exam prep</p>
+            <span class="hint">Latest mock/standard exams</span>
+          </div>
+          <div id="examPrepList" class="history-list"></div>
+        </div>
+        <div class="dash-block">
+          <div class="history-header">
+            <p class="stat-label">Pace trend</p>
+            <span class="hint">Average seconds per answer</span>
+          </div>
+          <div class="time-charts">
+            <div>
+              <p class="hint">Last 10 sessions</p>
+              <div id="timeSessionTrend" class="micro-chart"></div>
+            </div>
+            <div>
+              <p class="hint">Last 30 days</p>
+              <div id="timeDayTrend" class="micro-chart"></div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-block">
+          <div class="history-header">
+            <p class="stat-label">Focus next</p>
+            <span class="hint">Weak modules + most missed questions</span>
+          </div>
+          <div class="focus-grid">
+            <div>
+              <p class="hint">Weakest modules</p>
+              <div id="focusModules" class="history-list"></div>
+            </div>
+            <div>
+              <p class="hint">Most missed questions</p>
+              <div id="focusQuestions" class="history-list"></div>
+            </div>
           </div>
         </div>
       </section>

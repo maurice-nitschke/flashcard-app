@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mock Exam</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Localhost Trainer</p>
+          <h1>Mock Exam</h1>
+          <p class="subtitle">Timed, sectioned exam with no mid-test feedback.</p>
+        </div>
+        <div class="top-actions">
+          <a class="ghost" href="index.html">Training view</a>
+          <a class="ghost" href="dashboard.html">Dashboard view</a>
+          <button class="ghost" id="loadSample">Load sample</button>
+        </div>
+      </header>
+
+      <section class="panel" id="importPanel">
+        <div class="panel-title">Import Questions</div>
+        <div class="import-grid">
+          <div class="import-card">
+            <h3>Upload JSON</h3>
+            <p>Accepts a single question object or an array of them.</p>
+            <input type="file" id="fileInput" accept="application/json" />
+            <button id="importFile" class="primary">Import file</button>
+          </div>
+          <div class="import-card">
+            <h3>Paste JSON</h3>
+            <p>Paste the question JSON and load instantly.</p>
+            <textarea id="jsonInput" spellcheck="false"></textarea>
+            <button id="importPaste" class="primary">Import pasted JSON</button>
+          </div>
+        </div>
+        <p class="hint" id="importStatus"></p>
+      </section>
+
+      <section class="panel" id="examPanel">
+        <div class="panel-title">Exam Setup</div>
+        <div class="exam-start" id="examStart">
+          <div class="exam-hero">
+            <div>
+              <p class="eyebrow">Exam Mode</p>
+              <h2>Simulate the real test environment</h2>
+              <p class="hint">
+                No feedback until the end. You need 70%+ to pass. Points:
+                <strong>+1</strong> correct, <strong>-0.5</strong> wrong, <strong>0</strong> skipped.
+              </p>
+              <ul class="exam-rules">
+                <li>Questions are grouped by module.</li>
+                <li>Navigate sections freely. Answers are optional.</li>
+                <li>Results are locked after review or time-out.</li>
+              </ul>
+            </div>
+            <div class="exam-setup">
+              <label class="stat-label" for="examType">Choose exam type</label>
+              <div class="select-wrap">
+                <select id="examType">
+                  <option value="standard">Standard exam · 120 questions · 90 min</option>
+                  <option value="mock">Mock exam · 30 questions · 20 min</option>
+                </select>
+              </div>
+              <button class="primary" id="examBegin">Start here</button>
+              <p class="hint">Questions are randomized with no duplicates.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="exam-shell" id="examShell">
+          <div class="exam-review" id="examReview">
+            <span>Review mode · answers are locked</span>
+            <button class="ghost" id="examBackToResults">Back to results</button>
+          </div>
+          <div class="exam-header">
+            <div>
+              <p class="stat-label">Time remaining</p>
+              <p class="stat-value" id="examTimer">90:00</p>
+            </div>
+            <div class="exam-progress">
+              <div class="exam-progress-bar" id="examProgress"></div>
+            </div>
+            <button class="ghost" id="examCheck">Check answers</button>
+          </div>
+          <div class="exam-section">
+            <h2 id="examModuleTitle">Module</h2>
+            <div id="examQuestions"></div>
+          </div>
+          <div class="exam-nav">
+            <button class="ghost" id="examPrev">Previous section</button>
+            <button class="ghost" id="examNext">Next section</button>
+          </div>
+          <div class="exam-quicklinks" id="examQuicklinks"></div>
+          <p class="hint">Completed sections are highlighted.</p>
+        </div>
+
+        <div class="exam-result" id="examResult"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

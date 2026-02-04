@@ -3,6 +3,7 @@ const STORAGE = {
   stats: "fc_stats_v2",
   settings: "fc_settings_v2",
   history: "fc_history_v1",
+  examHistory: "fc_exam_history_v1",
 };
 
 const SAMPLE_DATA = [
@@ -90,7 +91,27 @@ const state = {
     correct: 0,
     total: 0,
   },
+  answerTiming: {
+    startAt: 0,
+  },
   history: [],
+  examHistory: [],
+  exam: {
+    active: false,
+    completed: false,
+    review: false,
+    timer: null,
+    endsAt: 0,
+    startedAt: 0,
+    duration: 0,
+    total: 0,
+    sections: [],
+    currentIndex: 0,
+    answers: {},
+    questionTimes: {},
+    reviewTarget: null,
+    type: "standard",
+  },
   reminder: {
     enabled: false,
     interval: 30,
@@ -139,6 +160,27 @@ const elements = {
   startMicro: document.getElementById("startMicro"),
   notifyToggle: document.getElementById("notifyToggle"),
   notifyInterval: document.getElementById("notifyInterval"),
+  examPanel: document.getElementById("examPanel"),
+  examStart: document.getElementById("examStart"),
+  examType: document.getElementById("examType"),
+  examBegin: document.getElementById("examBegin"),
+  examShell: document.getElementById("examShell"),
+  examReview: document.getElementById("examReview"),
+  examBackToResults: document.getElementById("examBackToResults"),
+  examTimer: document.getElementById("examTimer"),
+  examProgress: document.getElementById("examProgress"),
+  examQuestions: document.getElementById("examQuestions"),
+  examModuleTitle: document.getElementById("examModuleTitle"),
+  examPrev: document.getElementById("examPrev"),
+  examNext: document.getElementById("examNext"),
+  examQuicklinks: document.getElementById("examQuicklinks"),
+  examCheck: document.getElementById("examCheck"),
+  examResult: document.getElementById("examResult"),
+  examPrepList: document.getElementById("examPrepList"),
+  timeSessionTrend: document.getElementById("timeSessionTrend"),
+  timeDayTrend: document.getElementById("timeDayTrend"),
+  focusModules: document.getElementById("focusModules"),
+  focusQuestions: document.getElementById("focusQuestions"),
 };
 
 function loadFromStorage() {
@@ -156,6 +198,14 @@ function loadFromStorage() {
       state.history = JSON.parse(storedHistory);
     } catch (error) {
       state.history = [];
+    }
+  }
+  const storedExamHistory = localStorage.getItem(STORAGE.examHistory);
+  if (storedExamHistory) {
+    try {
+      state.examHistory = JSON.parse(storedExamHistory);
+    } catch (error) {
+      state.examHistory = [];
     }
   }
   const storedStats = localStorage.getItem(STORAGE.stats);
@@ -208,6 +258,10 @@ function saveStats() {
 
 function saveHistory() {
   localStorage.setItem(STORAGE.history, JSON.stringify(state.history));
+}
+
+function saveExamHistory() {
+  localStorage.setItem(STORAGE.examHistory, JSON.stringify(state.examHistory));
 }
 
 function normalizeQuestions(input) {
@@ -359,6 +413,9 @@ function renderStats() {
   if (elements.bestModuleSpark) renderBestModuleSpark();
   if (elements.moduleStats) renderModuleStats();
   if (elements.historyList) renderHistory();
+  if (elements.examPrepList) renderExamPrep();
+  if (elements.timeSessionTrend || elements.timeDayTrend) renderTimeTrends();
+  if (elements.focusModules || elements.focusQuestions) renderFocusList();
 }
 
 function shuffle(list) {
@@ -476,6 +533,7 @@ function renderQuestion() {
   }
   state.current = pickWeighted(pool);
   state.attemptCount = 0;
+  state.answerTiming.startAt = Date.now();
 
   const question = state.current;
   elements.questionText.textContent = question.question;
@@ -584,7 +642,10 @@ function applyResult(result) {
   if (result === "wrong") stats.wrong += 1;
   updateSrs(state.current.questionId, result);
   saveStats();
-  trackSession(result);
+  const duration = state.answerTiming.startAt
+    ? Math.max(0, Date.now() - state.answerTiming.startAt)
+    : 0;
+  trackSession(result, duration);
   renderStats();
   updateProgress(state.current.questionId);
 
@@ -625,6 +686,9 @@ function importQuestions(raw) {
   setPanels();
   renderStats();
   renderQuestion();
+  if (elements.examPanel) {
+    setExamPanels();
+  }
   if (elements.importStatus) {
     elements.importStatus.textContent = `Loaded ${normalized.length} questions.`;
   }
@@ -775,6 +839,49 @@ if (elements.notifyInterval) {
   });
 }
 
+if (elements.examBegin) {
+  elements.examBegin.addEventListener("click", () => {
+    const type = elements.examType?.value || "standard";
+    startExam(type);
+  });
+}
+
+if (elements.examPrev) {
+  elements.examPrev.addEventListener("click", () => {
+    if (!state.exam.active) return;
+    state.exam.currentIndex = Math.max(0, state.exam.currentIndex - 1);
+    renderExamSection();
+  });
+}
+
+if (elements.examNext) {
+  elements.examNext.addEventListener("click", () => {
+    if (!state.exam.active) return;
+    state.exam.currentIndex = Math.min(
+      state.exam.sections.length - 1,
+      state.exam.currentIndex + 1
+    );
+    renderExamSection();
+  });
+}
+
+if (elements.examCheck) {
+  elements.examCheck.addEventListener("click", () => {
+    if (!state.exam.active || state.exam.completed) return;
+    finishExam(false);
+  });
+}
+
+if (elements.examBackToResults) {
+  elements.examBackToResults.addEventListener("click", () => {
+    if (!state.exam.completed) return;
+    state.exam.review = false;
+    state.exam.reviewTarget = null;
+    if (elements.examShell) elements.examShell.style.display = "none";
+    if (elements.examResult) elements.examResult.style.display = "block";
+  });
+}
+
 function init() {
   loadFromStorage();
   buildModules();
@@ -796,6 +903,7 @@ function init() {
   if (state.mode === "sprint") setSprint(true);
   setupReminder();
   if (state.questions.length) renderQuestion();
+  if (elements.examPanel) initExam();
 }
 
 init();
@@ -862,7 +970,7 @@ function renderModuleStats() {
     });
 }
 
-function trackSession(result) {
+function trackSession(result, durationMs) {
   if (!state.current) return;
   const now = Date.now();
   const lastSession = state.history[state.history.length - 1];
@@ -875,12 +983,18 @@ function trackSession(result) {
       module: state.module,
       attempts: 0,
       correct: 0,
+      timeSumMs: 0,
+      answeredCount: 0,
     });
   }
   const session = state.history[state.history.length - 1];
   session.attempts += 1;
   if (result === "correct_first" || result === "correct_second") {
     session.correct += 1;
+  }
+  if (durationMs) {
+    session.timeSumMs += durationMs;
+    session.answeredCount += 1;
   }
   session.lastAt = now;
   saveHistory();
@@ -906,6 +1020,564 @@ function renderHistory() {
     `;
     elements.historyList.appendChild(item);
   });
+}
+
+function renderExamPrep() {
+  elements.examPrepList.innerHTML = "";
+  const recent = [...state.examHistory].slice(-5).reverse();
+  if (!recent.length) {
+    elements.examPrepList.innerHTML = "<div class=\"hint\">No exam attempts yet.</div>";
+    return;
+  }
+  recent.forEach((attempt) => {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    const time = new Date(attempt.startedAt).toLocaleString();
+    const percent = `${attempt.percent.toFixed(1)}%`;
+    item.innerHTML = `
+      <span>${time} · ${attempt.type} · ${attempt.total} Q</span>
+      <span>${percent} · ${attempt.pass ? "PASS" : "FAIL"}</span>
+    `;
+    elements.examPrepList.appendChild(item);
+  });
+}
+
+function renderTimeTrends() {
+  if (elements.timeSessionTrend) {
+    const recent = state.history
+      .filter((session) => session.answeredCount)
+      .slice(-10);
+    renderTimeBars(elements.timeSessionTrend, recent.map((session) => {
+      return session.timeSumMs / session.answeredCount / 1000;
+    }));
+  }
+  if (elements.timeDayTrend) {
+    const dayAverages = getTimeByDay(30);
+    renderTimeBars(elements.timeDayTrend, dayAverages);
+  }
+}
+
+function renderTimeBars(container, values) {
+  if (!container) return;
+  container.innerHTML = "";
+  if (!values.length) {
+    container.innerHTML = "<div class=\"hint\">No timing data yet.</div>";
+    return;
+  }
+  const max = Math.max(...values, 1);
+  values.forEach((value) => {
+    const bar = document.createElement("div");
+    bar.className = "micro-bar";
+    const height = Math.max(6, Math.round((value / max) * 44));
+    bar.style.height = `${height}px`;
+    bar.title = `${value.toFixed(1)}s`;
+    container.appendChild(bar);
+  });
+}
+
+function getTimeByDay(days) {
+  const now = new Date();
+  const buckets = Array.from({ length: days }, () => ({ sum: 0, count: 0 }));
+  state.history.forEach((session) => {
+    if (!session.answeredCount) return;
+    const date = new Date(session.startedAt);
+    const diff = Math.floor((now - date) / (24 * 60 * 60 * 1000));
+    if (diff >= 0 && diff < days) {
+      buckets[days - diff - 1].sum += session.timeSumMs / session.answeredCount / 1000;
+      buckets[days - diff - 1].count += 1;
+    }
+  });
+  return buckets.map((bucket) => (bucket.count ? bucket.sum / bucket.count : 0));
+}
+
+function renderFocusList() {
+  if (elements.focusModules) {
+    const moduleStats = getModuleStats();
+    const weakModules = Object.entries(moduleStats)
+      .sort((a, b) => a[1].accuracy - b[1].accuracy)
+      .slice(0, 3);
+    elements.focusModules.innerHTML = weakModules.length
+      ? ""
+      : "<div class=\"hint\">No module data yet.</div>";
+    weakModules.forEach(([module, stats]) => {
+      const item = document.createElement("div");
+      item.className = "focus-item";
+      item.textContent = `${module} · ${stats.accuracy}%`;
+      elements.focusModules.appendChild(item);
+    });
+  }
+  if (elements.focusQuestions) {
+    const missed = getMostMissedQuestions(5);
+    elements.focusQuestions.innerHTML = missed.length
+      ? ""
+      : "<div class=\"hint\">No misses yet.</div>";
+    missed.forEach((question) => {
+      const item = document.createElement("div");
+      item.className = "focus-item";
+      item.textContent = `${question.module} · ${question.question}`;
+      elements.focusQuestions.appendChild(item);
+    });
+  }
+}
+
+function getMostMissedQuestions(limit) {
+  return state.questions
+    .map((question) => {
+      const modes = getStats(question.questionId).modes;
+      const wrong = modes.reveal.wrong + modes.second.wrong;
+      return { ...question, wrong };
+    })
+    .filter((question) => question.wrong > 0)
+    .sort((a, b) => b.wrong - a.wrong)
+    .slice(0, limit);
+}
+
+function initExam() {
+  setExamPanels();
+  if (elements.examType) {
+    elements.examType.value = "standard";
+  }
+  if (elements.examReview) {
+    elements.examReview.style.display = "none";
+  }
+}
+
+function setExamPanels() {
+  if (!elements.examPanel) return;
+  const hasQuestions = state.questions.length > 0;
+  if (elements.importPanel) {
+    elements.importPanel.style.display = hasQuestions ? "none" : "block";
+  }
+  if (elements.examShell) {
+    elements.examShell.style.display = hasQuestions ? "none" : "none";
+  }
+  if (elements.examStart) {
+    elements.examStart.style.display = hasQuestions ? "flex" : "none";
+  }
+  if (elements.examResult) {
+    elements.examResult.style.display = "none";
+  }
+}
+
+function startExam(type) {
+  if (!state.questions.length) return;
+  const config =
+    type === "mock"
+      ? { total: 30, minutes: 20, minPer: 2, maxPer: 3 }
+      : { total: 120, minutes: 90, minPer: 4, maxPer: 5 };
+  const sections = buildExamSections(config.total, config.minPer, config.maxPer);
+  const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
+  state.exam = {
+    active: true,
+    completed: false,
+    review: false,
+    timer: null,
+    endsAt: Date.now() + config.minutes * 60 * 1000,
+    startedAt: Date.now(),
+    duration: config.minutes * 60 * 1000,
+    total: totalQuestions,
+    sections,
+    currentIndex: 0,
+    answers: {},
+    questionTimes: {},
+    reviewTarget: null,
+    type: type === "mock" ? "Mock" : "Standard",
+  };
+  if (elements.examStart) elements.examStart.style.display = "none";
+  if (elements.examShell) elements.examShell.style.display = "flex";
+  if (elements.examResult) elements.examResult.style.display = "none";
+  renderExamQuicklinks();
+  renderExamSection();
+  startExamTimer();
+}
+
+function buildExamSections(totalTarget, minPerModule, maxPerModule) {
+  const moduleMap = new Map();
+  state.questions.forEach((question) => {
+    if (!moduleMap.has(question.module)) moduleMap.set(question.module, []);
+    moduleMap.get(question.module).push(question);
+  });
+  const modules = Array.from(moduleMap.keys());
+  modules.forEach((module) => {
+    moduleMap.set(module, shuffle(moduleMap.get(module)));
+  });
+  let availableModules = shuffle(modules);
+  const maxModules = Math.max(1, Math.floor(totalTarget / minPerModule));
+  if (availableModules.length > maxModules) {
+    availableModules = availableModules.slice(0, maxModules);
+  }
+  const sections = availableModules.map((module) => ({
+    module,
+    questions: [],
+  }));
+  let total = 0;
+  sections.forEach((section) => {
+    const pool = moduleMap.get(section.module) || [];
+    const count = Math.min(minPerModule, pool.length);
+    section.questions = pool.splice(0, count);
+    total += section.questions.length;
+  });
+  let maxCapReached = false;
+  while (total < totalTarget) {
+    let added = false;
+    const poolOrder = shuffle(sections);
+    for (const section of poolOrder) {
+      const pool = moduleMap.get(section.module) || [];
+      if (!pool.length) continue;
+      if (!maxCapReached && section.questions.length >= maxPerModule) continue;
+      section.questions.push(pool.shift());
+      total += 1;
+      added = true;
+      if (total >= totalTarget) break;
+    }
+    if (!added) {
+      if (!maxCapReached) {
+        maxCapReached = true;
+      } else {
+        break;
+      }
+    }
+  }
+  return sections.filter((section) => section.questions.length > 0);
+}
+
+function renderExamQuicklinks() {
+  if (!elements.examQuicklinks) return;
+  elements.examQuicklinks.innerHTML = "";
+  state.exam.sections.forEach((section, index) => {
+    const btn = document.createElement("button");
+    btn.textContent = section.module;
+    btn.title = section.module;
+    const answeredCount = section.questions.filter(
+      (question) => state.exam.answers[question.questionId]
+    ).length;
+    const completed = answeredCount === section.questions.length && section.questions.length;
+    btn.classList.toggle("active", index === state.exam.currentIndex);
+    btn.classList.toggle("completed", completed);
+    btn.addEventListener("click", () => {
+      state.exam.currentIndex = index;
+      renderExamSection();
+    });
+    elements.examQuicklinks.appendChild(btn);
+  });
+}
+
+function renderExamSection() {
+  if (!elements.examQuestions || !elements.examModuleTitle) return;
+  const section = state.exam.sections[state.exam.currentIndex];
+  if (!section) return;
+  elements.examModuleTitle.textContent = section.module;
+  elements.examQuestions.innerHTML = "";
+  section.questions.forEach((question, index) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "exam-question";
+    if (state.exam.reviewTarget === question.questionId) {
+      wrapper.classList.add("focus");
+    }
+    wrapper.innerHTML = `<h4>${index + 1}. ${question.question}</h4>`;
+    const options = document.createElement("div");
+    options.className = "exam-options";
+    if (!state.exam.completed && !state.exam.questionTimes[question.questionId]) {
+      state.exam.questionTimes[question.questionId] = {
+        startAt: Date.now(),
+        answeredAt: 0,
+        durationMs: 0,
+      };
+    }
+    question.answers.forEach((answer) => {
+      const label = document.createElement("label");
+      label.className = "exam-option";
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = `exam-${question.questionId}`;
+      input.value = answer.answerId;
+      input.checked = state.exam.answers[question.questionId] === answer.answerId;
+      input.disabled = state.exam.completed;
+      input.addEventListener("change", () => {
+        if (state.exam.completed) return;
+        state.exam.answers[question.questionId] = answer.answerId;
+        const timing = state.exam.questionTimes[question.questionId];
+        if (timing && !timing.answeredAt) {
+          timing.answeredAt = Date.now();
+          timing.durationMs = timing.answeredAt - timing.startAt;
+        }
+        renderExamQuicklinks();
+      });
+      const span = document.createElement("span");
+      span.textContent = answer.text;
+      label.appendChild(input);
+      label.appendChild(span);
+      if (state.exam.completed) {
+        const selected = state.exam.answers[question.questionId];
+        if (answer.answerId === question.correctAnswerId) {
+          label.classList.add("correct");
+        } else if (selected === answer.answerId) {
+          label.classList.add("incorrect");
+        }
+      }
+      options.appendChild(label);
+    });
+    wrapper.appendChild(options);
+    elements.examQuestions.appendChild(wrapper);
+  });
+  renderExamQuicklinks();
+  if (elements.examPrev) elements.examPrev.disabled = state.exam.currentIndex === 0;
+  if (elements.examNext) {
+    elements.examNext.disabled =
+      state.exam.currentIndex === state.exam.sections.length - 1;
+  }
+  if (elements.examReview) {
+    elements.examReview.style.display = state.exam.completed ? "flex" : "none";
+  }
+  if (elements.examCheck) {
+    elements.examCheck.disabled = state.exam.completed;
+  }
+}
+
+function startExamTimer() {
+  if (state.exam.timer) clearInterval(state.exam.timer);
+  updateExamTimer();
+  state.exam.timer = setInterval(updateExamTimer, 500);
+}
+
+function updateExamTimer() {
+  if (!state.exam.active) return;
+  const remaining = Math.max(0, state.exam.endsAt - Date.now());
+  const minutes = Math.floor(remaining / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  if (elements.examTimer) {
+    elements.examTimer.textContent = `${String(minutes).padStart(2, "0")}:${String(
+      seconds
+    ).padStart(2, "0")}`;
+  }
+  if (elements.examProgress) {
+    const elapsed = state.exam.duration - remaining;
+    const percent = Math.min(100, Math.round((elapsed / state.exam.duration) * 100));
+    elements.examProgress.style.width = `${percent}%`;
+  }
+  if (remaining <= 0) {
+    finishExam(true);
+  }
+}
+
+function finishExam(autoTriggered) {
+  if (state.exam.completed) return;
+  state.exam.active = false;
+  state.exam.completed = true;
+  if (state.exam.timer) clearInterval(state.exam.timer);
+  const result = evaluateExam();
+  state.examHistory.push(result);
+  saveExamHistory();
+  renderStats();
+  showExamResult(result, autoTriggered);
+}
+
+function evaluateExam() {
+  let correct = 0;
+  let wrong = 0;
+  let skipped = 0;
+  let timeSumMs = 0;
+  let answeredCount = 0;
+  const moduleBreakdown = {};
+  state.exam.sections.forEach((section) => {
+    moduleBreakdown[section.module] = {
+      correct: 0,
+      wrong: 0,
+      skipped: 0,
+      timeSumMs: 0,
+      answeredCount: 0,
+    };
+    section.questions.forEach((question) => {
+      const selected = state.exam.answers[question.questionId];
+      const timing = state.exam.questionTimes[question.questionId];
+      if (!selected) {
+        skipped += 1;
+        moduleBreakdown[section.module].skipped += 1;
+        return;
+      }
+      if (selected === question.correctAnswerId) {
+        correct += 1;
+        moduleBreakdown[section.module].correct += 1;
+      } else {
+        wrong += 1;
+        moduleBreakdown[section.module].wrong += 1;
+      }
+      if (timing && timing.durationMs) {
+        timeSumMs += timing.durationMs;
+        answeredCount += 1;
+        moduleBreakdown[section.module].timeSumMs += timing.durationMs;
+        moduleBreakdown[section.module].answeredCount += 1;
+      }
+    });
+  });
+  const points = correct - wrong * 0.5;
+  const percent = Math.max(0, (points / state.exam.total) * 100);
+  const avgTimeMs = answeredCount ? timeSumMs / answeredCount : 0;
+  return {
+    id: `exam-${Date.now()}`,
+    type: state.exam.type,
+    startedAt: state.exam.startedAt,
+    total: state.exam.total,
+    correct,
+    wrong,
+    skipped,
+    points,
+    percent,
+    pass: percent >= 70,
+    moduleBreakdown,
+    avgTimeMs,
+  };
+}
+
+function showExamResult(result, autoTriggered) {
+  if (!elements.examResult) return;
+  if (elements.examShell) elements.examShell.style.display = "none";
+  elements.examResult.style.display = "block";
+  const status = result.pass ? "PASS" : "FAIL";
+  const note = autoTriggered ? "Time is up. Results are locked." : "Results are locked.";
+  const wrongQuestions = [];
+  state.exam.sections.forEach((section) => {
+    section.questions.forEach((question) => {
+      const selected = state.exam.answers[question.questionId];
+      if (selected && selected !== question.correctAnswerId) {
+        wrongQuestions.push({
+          module: section.module,
+          questionId: question.questionId,
+          text: question.question,
+        });
+      }
+    });
+  });
+  const avgTimeSec = result.avgTimeMs ? (result.avgTimeMs / 1000).toFixed(1) : "--";
+  elements.examResult.innerHTML = `
+    <div class="exam-summary">
+      <div class="exam-diagram">
+        <p class="stat-label">Final score</p>
+        <div class="exam-donut">
+          <svg viewBox="0 0 120 120">
+            <circle class="ring-track" cx="60" cy="60" r="46"></circle>
+            <circle class="ring-bar" id="examScoreRing" cx="60" cy="60" r="46"></circle>
+          </svg>
+          <div class="ring-label">
+            <span>${result.percent.toFixed(1)}%</span>
+            <small>${status}</small>
+          </div>
+        </div>
+        <p class="hint">Points: ${result.points.toFixed(1)} / ${result.total}</p>
+        <p class="hint">Correct ${result.correct} · Wrong ${result.wrong} · Skipped ${result.skipped}</p>
+        <p class="hint">Avg time per answer: ${avgTimeSec}s</p>
+        <p class="hint">${note}</p>
+        <button class="primary" id="examRestart">Start new exam</button>
+      </div>
+      <div class="exam-bars">
+        ${Object.entries(result.moduleBreakdown)
+          .map(([module, stats]) => {
+            const total = stats.correct + stats.wrong + stats.skipped;
+            const accuracy = total
+              ? Math.round((stats.correct / total) * 100)
+              : 0;
+            const avgSec = stats.answeredCount
+              ? (stats.timeSumMs / stats.answeredCount / 1000).toFixed(1)
+              : "--";
+            return `
+              <div class="bar-row">
+                <span>${module}</span>
+                <div class="bar"><span style="width: ${accuracy}%"></span></div>
+                <span>${accuracy}% · ${avgSec}s</span>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+    <div class="exam-module-breakdown">
+      ${Object.entries(result.moduleBreakdown)
+        .map(
+          ([module, stats]) => `
+          <div class="module-card">
+            <h4>${module}</h4>
+            <div class="hint">Correct: ${stats.correct}</div>
+            <div class="hint">Wrong: ${stats.wrong}</div>
+            <div class="hint">Skipped: ${stats.skipped}</div>
+            <div class="hint">Avg time: ${
+              stats.answeredCount
+                ? (stats.timeSumMs / stats.answeredCount / 1000).toFixed(1)
+                : "--"
+            }s</div>
+          </div>
+        `
+        )
+        .join("")}
+    </div>
+    <div class="exam-wrong-list" id="examWrongList">
+      ${wrongQuestions.length
+        ? wrongQuestions
+            .map(
+              (item) => `
+            <div class="exam-wrong-item">
+              <span>${item.module} · ${item.text}</span>
+              <button class="ghost" data-question-id="${item.questionId}">Review</button>
+            </div>
+          `
+            )
+            .join("")
+        : "<div class=\"hint\">No wrong answers. Great work.</div>"}
+    </div>
+    <p class="exam-review-note">Click any wrong question to review the locked answers.</p>
+  `;
+  updateExamDonut(result.percent);
+  const restartBtn = elements.examResult.querySelector("#examRestart");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", resetExam);
+  }
+  const wrongList = elements.examResult.querySelector("#examWrongList");
+  if (wrongList) {
+    wrongList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-question-id]");
+      if (!button) return;
+      openExamReview(button.dataset.questionId);
+    });
+  }
+}
+
+function updateExamDonut(percent) {
+  const ring = document.getElementById("examScoreRing");
+  if (!ring) return;
+  const circumference = 2 * Math.PI * 46;
+  const offset = circumference - (percent / 100) * circumference;
+  ring.style.strokeDasharray = String(circumference);
+  ring.style.strokeDashoffset = String(offset);
+}
+
+function openExamReview(questionId) {
+  if (!state.exam.completed) return;
+  state.exam.review = true;
+  state.exam.reviewTarget = questionId || null;
+  const sectionIndex = findExamSectionIndex(questionId);
+  if (sectionIndex !== -1) state.exam.currentIndex = sectionIndex;
+  if (elements.examResult) elements.examResult.style.display = "none";
+  if (elements.examShell) elements.examShell.style.display = "flex";
+  renderExamSection();
+}
+
+function findExamSectionIndex(questionId) {
+  if (!questionId) return -1;
+  return state.exam.sections.findIndex((section) =>
+    section.questions.some((question) => question.questionId === questionId)
+  );
+}
+
+function resetExam() {
+  state.exam.active = false;
+  state.exam.completed = false;
+  state.exam.review = false;
+  state.exam.sections = [];
+  state.exam.answers = {};
+  state.exam.questionTimes = {};
+  state.exam.reviewTarget = null;
+  if (elements.examResult) elements.examResult.style.display = "none";
+  if (elements.examStart) elements.examStart.style.display = "flex";
+  if (elements.examShell) elements.examShell.style.display = "none";
 }
 
 function updateAccuracyRing(value) {
