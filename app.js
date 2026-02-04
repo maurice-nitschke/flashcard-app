@@ -107,6 +107,7 @@ const elements = {
   importFile: document.getElementById("importFile"),
   jsonInput: document.getElementById("jsonInput"),
   importPaste: document.getElementById("importPaste"),
+  importStatus: document.getElementById("importStatus"),
   loadSample: document.getElementById("loadSample"),
   resetProgress: document.getElementById("resetProgress"),
   modeSelect: document.getElementById("modeSelect"),
@@ -270,6 +271,9 @@ function setPanels() {
   if (elements.importPanel) {
     elements.importPanel.style.display = hasQuestions ? "none" : "block";
   }
+  if (!hasQuestions && elements.importStatus) {
+    elements.importStatus.textContent = "";
+  }
 }
 
 function getStats(questionId) {
@@ -416,7 +420,9 @@ function setSprint(active) {
   }
   if (!active) {
     state.sprint.active = false;
-    elements.statSprint.textContent = "--:--";
+    if (elements.statSprint) {
+      elements.statSprint.textContent = "--:--";
+    }
     return;
   }
   state.sprint.active = true;
@@ -433,12 +439,18 @@ function updateSprintTimer() {
   const display = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
     seconds % 60
   ).padStart(2, "0")}`;
-  elements.statSprint.textContent = display;
+  if (elements.statSprint) {
+    elements.statSprint.textContent = display;
+  }
   if (remaining <= 0) {
     setSprint(false);
-    elements.feedback.textContent = `Sprint over: ${state.sprint.correct} correct out of ${state.sprint.total}.`;
+    if (elements.feedback) {
+      elements.feedback.textContent = `Sprint over: ${state.sprint.correct} correct out of ${state.sprint.total}.`;
+    }
     lockAnswers();
-    elements.nextBtn.textContent = "Restart sprint";
+    if (elements.nextBtn) {
+      elements.nextBtn.textContent = "Restart sprint";
+    }
   }
 }
 
@@ -600,7 +612,12 @@ function applyResult(result) {
 
 function importQuestions(raw) {
   const normalized = normalizeQuestions(raw);
-  if (!normalized.length) return;
+  if (!normalized.length) {
+    if (elements.importStatus) {
+      elements.importStatus.textContent = "No valid questions found in that JSON.";
+    }
+    return;
+  }
   state.questions = normalized;
   saveQuestions();
   buildModules();
@@ -608,6 +625,9 @@ function importQuestions(raw) {
   setPanels();
   renderStats();
   renderQuestion();
+  if (elements.importStatus) {
+    elements.importStatus.textContent = `Loaded ${normalized.length} questions.`;
+  }
 }
 
 if (elements.importFile) {
@@ -618,6 +638,9 @@ if (elements.importFile) {
     try {
       importQuestions(JSON.parse(text));
     } catch (error) {
+      if (elements.importStatus) {
+        elements.importStatus.textContent = "Invalid JSON file.";
+      }
       if (elements.feedback) elements.feedback.textContent = "Invalid JSON file.";
     }
   });
@@ -629,6 +652,9 @@ if (elements.importPaste) {
       const parsed = JSON.parse(elements.jsonInput.value);
       importQuestions(parsed);
     } catch (error) {
+      if (elements.importStatus) {
+        elements.importStatus.textContent = "Invalid JSON pasted.";
+      }
       if (elements.feedback) elements.feedback.textContent = "Invalid JSON pasted.";
     }
   });
