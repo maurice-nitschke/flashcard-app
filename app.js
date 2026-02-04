@@ -2,6 +2,7 @@ const STORAGE = {
   questions: "fc_questions_v2",
   stats: "fc_stats_v2",
   settings: "fc_settings_v2",
+  history: "fc_history_v1",
 };
 
 const SAMPLE_DATA = [
@@ -83,6 +84,19 @@ const state = {
     correct: 0,
     total: 0,
   },
+  micro: {
+    active: false,
+    remaining: 0,
+    correct: 0,
+    total: 0,
+  },
+  history: [],
+  reminder: {
+    enabled: false,
+    interval: 30,
+    nextAt: 0,
+    timer: null,
+  },
 };
 
 const elements = {
@@ -103,6 +117,12 @@ const elements = {
   statDue: document.getElementById("statDue"),
   statAccuracy: document.getElementById("statAccuracy"),
   statSprint: document.getElementById("statSprint"),
+  statReviewed: document.getElementById("statReviewed"),
+  statSessions: document.getElementById("statSessions"),
+  statBestModule: document.getElementById("statBestModule"),
+  moduleStats: document.getElementById("moduleStats"),
+  historyList: document.getElementById("historyList"),
+  clearHistory: document.getElementById("clearHistory"),
   modulePill: document.getElementById("modulePill"),
   counter: document.getElementById("counter"),
   questionText: document.getElementById("questionText"),
@@ -110,6 +130,9 @@ const elements = {
   feedback: document.getElementById("feedback"),
   progressBar: document.getElementById("progressBar"),
   nextBtn: document.getElementById("nextBtn"),
+  startMicro: document.getElementById("startMicro"),
+  notifyToggle: document.getElementById("notifyToggle"),
+  notifyInterval: document.getElementById("notifyInterval"),
 };
 
 function loadFromStorage() {
@@ -119,6 +142,14 @@ function loadFromStorage() {
       state.questions = JSON.parse(storedQuestions);
     } catch (error) {
       state.questions = [];
+    }
+  }
+  const storedHistory = localStorage.getItem(STORAGE.history);
+  if (storedHistory) {
+    try {
+      state.history = JSON.parse(storedHistory);
+    } catch (error) {
+      state.history = [];
     }
   }
   const storedStats = localStorage.getItem(STORAGE.stats);
@@ -138,6 +169,8 @@ function loadFromStorage() {
       state.attemptMode = settings.attemptMode || state.attemptMode;
       state.shuffle = settings.shuffle ?? state.shuffle;
       state.autoNext = settings.autoNext ?? state.autoNext;
+      state.reminder.enabled = settings.reminderEnabled ?? state.reminder.enabled;
+      state.reminder.interval = settings.reminderInterval ?? state.reminder.interval;
     } catch (error) {
       // ignore
     }
@@ -153,6 +186,8 @@ function saveSettings() {
       attemptMode: state.attemptMode,
       shuffle: state.shuffle,
       autoNext: state.autoNext,
+      reminderEnabled: state.reminder.enabled,
+      reminderInterval: state.reminder.interval,
     })
   );
 }
@@ -163,6 +198,10 @@ function saveQuestions() {
 
 function saveStats() {
   localStorage.setItem(STORAGE.stats, JSON.stringify(state.stats));
+}
+
+function saveHistory() {
+  localStorage.setItem(STORAGE.history, JSON.stringify(state.history));
 }
 
 function normalizeQuestions(input) {
@@ -293,6 +332,12 @@ function renderStats() {
   elements.statTotal.textContent = state.questions.length;
   elements.statDue.textContent = getDueCount();
   elements.statAccuracy.textContent = `${getAccuracy()}%`;
+  elements.statReviewed.textContent = getTotalReviewed();
+  elements.statSessions.textContent = state.history.length;
+  const bestModule = getBestModule();
+  elements.statBestModule.textContent = bestModule || "--";
+  renderModuleStats();
+  renderHistory();
 }
 
 function shuffle(list) {
@@ -423,7 +468,9 @@ function renderQuestion() {
     state.mode !== "random" && state.module !== "All Modules"
       ? pool
       : state.questions;
-  elements.counter.textContent = `${modulePool.length} cards`;
+  elements.counter.textContent = state.micro.active
+    ? `${state.micro.remaining} cards left`
+    : `${modulePool.length} cards`;
   updateProgress(question.questionId);
 }
 
@@ -495,6 +542,7 @@ function applyResult(result) {
   if (result === "wrong") stats.wrong += 1;
   updateSrs(state.current.questionId, result);
   saveStats();
+  trackSession(result);
   renderStats();
   updateProgress(state.current.questionId);
 
@@ -502,6 +550,18 @@ function applyResult(result) {
     state.sprint.total += 1;
     if (result === "correct_first" || result === "correct_second") {
       state.sprint.correct += 1;
+    }
+  }
+
+  if (state.micro.active) {
+    state.micro.total += 1;
+    if (result === "correct_first" || result === "correct_second") {
+      state.micro.correct += 1;
+    }
+    state.micro.remaining = Math.max(0, state.micro.remaining - 1);
+    if (state.micro.remaining === 0) {
+      state.micro.active = false;
+      elements.feedback.textContent = `Microlearning done: ${state.micro.correct} correct out of ${state.micro.total}.`;
     }
   }
 }
@@ -550,6 +610,12 @@ elements.resetProgress.addEventListener("click", () => {
   if (state.current) updateProgress(state.current.questionId);
 });
 
+elements.clearHistory.addEventListener("click", () => {
+  state.history = [];
+  saveHistory();
+  renderStats();
+});
+
 elements.modeSelect.addEventListener("change", (event) => {
   state.mode = event.target.value;
   saveSettings();
@@ -596,6 +662,31 @@ elements.nextBtn.addEventListener("click", () => {
   renderQuestion();
 });
 
+elements.startMicro.addEventListener("click", () => {
+  state.micro.active = true;
+  state.micro.remaining = 20;
+  state.micro.correct = 0;
+  state.micro.total = 0;
+  renderQuestion();
+});
+
+elements.notifyToggle.addEventListener("change", async (event) => {
+  state.reminder.enabled = event.target.checked;
+  saveSettings();
+  if (state.reminder.enabled && "Notification" in window) {
+    if (Notification.permission !== "granted") {
+      await Notification.requestPermission();
+    }
+  }
+  setupReminder();
+});
+
+elements.notifyInterval.addEventListener("change", (event) => {
+  state.reminder.interval = Number(event.target.value);
+  saveSettings();
+  setupReminder();
+});
+
 function init() {
   loadFromStorage();
   buildModules();
@@ -605,11 +696,144 @@ function init() {
   elements.modeSelect.value = state.mode;
   elements.shuffleToggle.checked = state.shuffle;
   elements.autoNextToggle.checked = state.autoNext;
+  elements.notifyToggle.checked = state.reminder.enabled;
+  elements.notifyInterval.value = String(state.reminder.interval);
   elements.segmentedButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.attempt === state.attemptMode);
   });
   if (state.mode === "sprint") setSprint(true);
+  setupReminder();
   if (state.questions.length) renderQuestion();
 }
 
 init();
+
+function getTotalReviewed() {
+  return Object.values(state.stats).reduce((sum, entry) => {
+    const modes = entry.modes;
+    return (
+      sum +
+      modes.reveal.attempts +
+      modes.second.attempts
+    );
+  }, 0);
+}
+
+function getBestModule() {
+  const moduleStats = getModuleStats();
+  const modules = Object.entries(moduleStats);
+  if (!modules.length) return "";
+  modules.sort((a, b) => b[1].accuracy - a[1].accuracy);
+  return modules[0][0];
+}
+
+function getModuleStats() {
+  const stats = {};
+  state.questions.forEach((question) => {
+    const module = question.module;
+    if (!stats[module]) {
+      stats[module] = { attempts: 0, correct: 0 };
+    }
+    const modeStats = getStats(question.questionId).modes;
+    const attempts = modeStats.reveal.attempts + modeStats.second.attempts;
+    const correct =
+      modeStats.reveal.correctFirst +
+      modeStats.reveal.correctSecond +
+      modeStats.second.correctFirst +
+      modeStats.second.correctSecond;
+    stats[module].attempts += attempts;
+    stats[module].correct += correct;
+  });
+  Object.values(stats).forEach((entry) => {
+    entry.accuracy = entry.attempts
+      ? Math.round((entry.correct / entry.attempts) * 100)
+      : 0;
+  });
+  return stats;
+}
+
+function renderModuleStats() {
+  const stats = getModuleStats();
+  elements.moduleStats.innerHTML = "";
+  Object.entries(stats)
+    .sort((a, b) => b[1].accuracy - a[1].accuracy)
+    .forEach(([module, entry]) => {
+      const card = document.createElement("div");
+      card.className = "module-card";
+      card.innerHTML = `
+        <h4>${module}</h4>
+        <div class="hint">Accuracy: ${entry.accuracy}%</div>
+        <div class="hint">Attempts: ${entry.attempts}</div>
+      `;
+      elements.moduleStats.appendChild(card);
+    });
+}
+
+function trackSession(result) {
+  if (!state.current) return;
+  const now = Date.now();
+  const lastSession = state.history[state.history.length - 1];
+  const withinWindow = lastSession && now - lastSession.startedAt < 30 * 60 * 1000;
+  if (!withinWindow) {
+    state.history.push({
+      id: `session-${now}`,
+      startedAt: now,
+      mode: state.mode,
+      module: state.module,
+      attempts: 0,
+      correct: 0,
+    });
+  }
+  const session = state.history[state.history.length - 1];
+  session.attempts += 1;
+  if (result === "correct_first" || result === "correct_second") {
+    session.correct += 1;
+  }
+  session.lastAt = now;
+  saveHistory();
+}
+
+function renderHistory() {
+  elements.historyList.innerHTML = "";
+  const recent = [...state.history].slice(-10).reverse();
+  if (!recent.length) {
+    elements.historyList.innerHTML = "<div class=\"hint\">No sessions yet.</div>";
+    return;
+  }
+  recent.forEach((session) => {
+    const item = document.createElement("div");
+    item.className = "history-item";
+    const accuracy = session.attempts
+      ? Math.round((session.correct / session.attempts) * 100)
+      : 0;
+    const time = new Date(session.startedAt).toLocaleString();
+    item.innerHTML = `
+      <span>${time} · ${session.mode} · ${session.module}</span>
+      <span>${session.attempts} attempts · ${accuracy}%</span>
+    `;
+    elements.historyList.appendChild(item);
+  });
+}
+
+function setupReminder() {
+  if (state.reminder.timer) {
+    clearInterval(state.reminder.timer);
+  }
+  if (!state.reminder.enabled) return;
+  if (!("Notification" in window)) return;
+  state.reminder.nextAt = Date.now() + state.reminder.interval * 60 * 1000;
+  state.reminder.timer = setInterval(() => {
+    if (Date.now() < state.reminder.nextAt) return;
+    state.reminder.nextAt = Date.now() + state.reminder.interval * 60 * 1000;
+    if (document.visibilityState === "visible") {
+      sendReminder();
+    }
+  }, 10000);
+}
+
+function sendReminder() {
+  const message = "Microlearning time: 20 quick cards to keep recall sharp.";
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("Flashcard Trainer", { body: message });
+  }
+}

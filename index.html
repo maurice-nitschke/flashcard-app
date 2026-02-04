@@ -46,6 +46,33 @@
       </section>
 
       <section class="panel" id="trainerPanel">
+        <div class="panel-title">Dashboard</div>
+        <div class="dashboard">
+          <div class="dash-card">
+            <p class="stat-label">Total reviewed</p>
+            <p class="stat-value" id="statReviewed">0</p>
+            <p class="hint">All answer attempts across modes.</p>
+          </div>
+          <div class="dash-card">
+            <p class="stat-label">Sessions</p>
+            <p class="stat-value" id="statSessions">0</p>
+            <p class="hint">Training sessions logged.</p>
+          </div>
+          <div class="dash-card">
+            <p class="stat-label">Best module</p>
+            <p class="stat-value" id="statBestModule">--</p>
+            <p class="hint">Highest accuracy.</p>
+          </div>
+        </div>
+        <div class="module-stats" id="moduleStats"></div>
+        <div class="history">
+          <div class="history-header">
+            <p class="stat-label">Training history</p>
+            <button class="ghost" id="clearHistory">Clear history</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </div>
+
         <div class="controls">
           <div>
             <label for="modeSelect">Mode</label>
@@ -79,6 +106,21 @@
                 <input type="checkbox" id="autoNextToggle" />
                 <span>Auto-next on correct</span>
               </label>
+            </div>
+          </div>
+          <div>
+            <label>Microlearning</label>
+            <div class="micro">
+              <button id="startMicro" class="primary">Start 20-card sprint</button>
+              <label class="toggle">
+                <input type="checkbox" id="notifyToggle" />
+                <span>Desktop reminder</span>
+              </label>
+              <select id="notifyInterval">
+                <option value="15">Every 15 min</option>
+                <option value="30" selected>Every 30 min</option>
+                <option value="60">Every 60 min</option>
+              </select>
             </div>
           </div>
         </div>
