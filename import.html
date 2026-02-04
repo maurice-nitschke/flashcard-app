@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Data</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-page="import">
+    <div class="ambient"></div>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Certification Trainer</p>
+          <h1>Manage Question Data</h1>
+          <p class="subtitle">Upload new JSON to add or replace your existing dataset.</p>
+        </div>
+        <div class="top-actions">
+          <a class="ghost" href="index.html">Training view</a>
+          <a class="ghost" href="dashboard.html">Dashboard view</a>
+          <a class="ghost" href="exam.html">Mock exam</a>
+        </div>
+      </header>
+
+      <section class="panel" id="importPanel">
+        <div class="panel-title">Import Questions</div>
+        <div class="import-grid">
+          <div class="import-card">
+            <h3>Upload JSON</h3>
+            <p>Accepts a single question object or an array of them.</p>
+            <input type="file" id="fileInput" accept="application/json" />
+            <button id="importFile" class="primary">Import file</button>
+          </div>
+          <div class="import-card">
+            <h3>Paste JSON</h3>
+            <p>Paste the question JSON and load instantly.</p>
+            <textarea id="jsonInput" spellcheck="false"></textarea>
+            <button id="importPaste" class="primary">Import pasted JSON</button>
+          </div>
+        </div>
+        <div class="import-options">
+          <label class="toggle">
+            <input type="radio" name="importMode" value="add" checked />
+            <span>Add to existing questions</span>
+          </label>
+          <label class="toggle">
+            <input type="radio" name="importMode" value="replace" />
+            <span>Replace existing questions</span>
+          </label>
+        </div>
+        <div class="import-actions">
+          <button class="ghost" id="resetQuestions">Reset stored questions</button>
+          <button class="ghost" id="resetProgress">Reset progress</button>
+        </div>
+        <p class="hint" id="importStatus"></p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

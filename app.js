@@ -129,6 +129,8 @@ const elements = {
   jsonInput: document.getElementById("jsonInput"),
   importPaste: document.getElementById("importPaste"),
   importStatus: document.getElementById("importStatus"),
+  importMode: document.querySelector("input[name=\"importMode\"]:checked"),
+  resetQuestions: document.getElementById("resetQuestions"),
   loadSample: document.getElementById("loadSample"),
   resetProgress: document.getElementById("resetProgress"),
   modeSelect: document.getElementById("modeSelect"),
@@ -294,6 +296,14 @@ function normalizeQuestions(input) {
     });
 }
 
+function mergeQuestions(existing, incoming) {
+  const map = new Map(existing.map((question) => [question.questionId, question]));
+  incoming.forEach((question) => {
+    map.set(question.questionId, question);
+  });
+  return Array.from(map.values());
+}
+
 function buildModules() {
   const modules = new Set(["All Modules"]);
   state.questions.forEach((question) => modules.add(question.module));
@@ -316,6 +326,13 @@ function renderModules() {
 
 function setPanels() {
   const hasQuestions = state.questions.length > 0;
+  const isImportPage = document.body?.dataset?.page === "import";
+  if (isImportPage) {
+    if (elements.importPanel) {
+      elements.importPanel.style.display = "block";
+    }
+    return;
+  }
   if (elements.trainerPanel) {
     elements.trainerPanel.style.display = hasQuestions ? "block" : "none";
   }
@@ -671,7 +688,7 @@ function applyResult(result) {
   }
 }
 
-function importQuestions(raw) {
+function importQuestions(raw, mode = "replace") {
   const normalized = normalizeQuestions(raw);
   if (!normalized.length) {
     if (elements.importStatus) {
@@ -679,7 +696,17 @@ function importQuestions(raw) {
     }
     return;
   }
-  state.questions = normalized;
+  if (mode === "add") {
+    state.questions = mergeQuestions(state.questions, normalized);
+  } else {
+    state.questions = normalized;
+    state.stats = {};
+    state.history = [];
+    state.examHistory = [];
+    saveStats();
+    saveHistory();
+    saveExamHistory();
+  }
   saveQuestions();
   buildModules();
   renderModules();
@@ -690,7 +717,10 @@ function importQuestions(raw) {
     setExamPanels();
   }
   if (elements.importStatus) {
-    elements.importStatus.textContent = `Loaded ${normalized.length} questions.`;
+    elements.importStatus.textContent =
+      mode === "add"
+        ? `Added ${normalized.length} questions.`
+        : `Loaded ${normalized.length} questions.`;
   }
 }
 
@@ -699,8 +729,9 @@ if (elements.importFile) {
     const file = elements.fileInput?.files?.[0];
     if (!file) return;
     const text = await file.text();
+    const mode = document.querySelector("input[name=\"importMode\"]:checked")?.value || "replace";
     try {
-      importQuestions(JSON.parse(text));
+      importQuestions(JSON.parse(text), mode);
     } catch (error) {
       if (elements.importStatus) {
         elements.importStatus.textContent = "Invalid JSON file.";
@@ -714,7 +745,8 @@ if (elements.importPaste) {
   elements.importPaste.addEventListener("click", () => {
     try {
       const parsed = JSON.parse(elements.jsonInput.value);
-      importQuestions(parsed);
+      const mode = document.querySelector("input[name=\"importMode\"]:checked")?.value || "replace";
+      importQuestions(parsed, mode);
     } catch (error) {
       if (elements.importStatus) {
         elements.importStatus.textContent = "Invalid JSON pasted.";
@@ -726,10 +758,9 @@ if (elements.importPaste) {
 
 if (elements.loadSample) {
   elements.loadSample.addEventListener("click", () => {
-    if (elements.jsonInput) {
-      elements.jsonInput.value = JSON.stringify(SAMPLE_DATA, null, 2);
+    if (elements.importStatus) {
+      elements.importStatus.textContent = "Sample loading is disabled. Use the Manage Data page.";
     }
-    importQuestions(SAMPLE_DATA);
   });
 }
 
@@ -739,6 +770,26 @@ if (elements.resetProgress) {
     saveStats();
     renderStats();
     if (state.current) updateProgress(state.current.questionId);
+  });
+}
+
+if (elements.resetQuestions) {
+  elements.resetQuestions.addEventListener("click", () => {
+    state.questions = [];
+    state.stats = {};
+    state.history = [];
+    state.examHistory = [];
+    saveQuestions();
+    saveStats();
+    saveHistory();
+    saveExamHistory();
+    buildModules();
+    renderModules();
+    setPanels();
+    renderStats();
+    if (elements.importStatus) {
+      elements.importStatus.textContent = "Stored questions cleared.";
+    }
   });
 }
 
