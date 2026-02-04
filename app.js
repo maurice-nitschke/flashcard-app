@@ -101,6 +101,7 @@ const state = {
 
 const elements = {
   importPanel: document.getElementById("importPanel"),
+  dashboardPanel: document.getElementById("dashboardPanel"),
   trainerPanel: document.getElementById("trainerPanel"),
   fileInput: document.getElementById("fileInput"),
   importFile: document.getElementById("importFile"),
@@ -120,6 +121,10 @@ const elements = {
   statReviewed: document.getElementById("statReviewed"),
   statSessions: document.getElementById("statSessions"),
   statBestModule: document.getElementById("statBestModule"),
+  ringAccuracy: document.getElementById("ringAccuracy"),
+  ringValue: document.getElementById("ringValue"),
+  sessionTrend: document.getElementById("sessionTrend"),
+  bestModuleSpark: document.getElementById("bestModuleSpark"),
   moduleStats: document.getElementById("moduleStats"),
   historyList: document.getElementById("historyList"),
   clearHistory: document.getElementById("clearHistory"),
@@ -256,6 +261,7 @@ function renderModules() {
 function setPanels() {
   const hasQuestions = state.questions.length > 0;
   elements.trainerPanel.style.display = hasQuestions ? "block" : "none";
+  elements.dashboardPanel.style.display = hasQuestions ? "block" : "none";
   elements.importPanel.style.display = hasQuestions ? "none" : "block";
 }
 
@@ -331,11 +337,15 @@ function getDueCount() {
 function renderStats() {
   elements.statTotal.textContent = state.questions.length;
   elements.statDue.textContent = getDueCount();
-  elements.statAccuracy.textContent = `${getAccuracy()}%`;
+  const accuracy = getAccuracy();
+  elements.statAccuracy.textContent = `${accuracy}%`;
   elements.statReviewed.textContent = getTotalReviewed();
   elements.statSessions.textContent = state.history.length;
   const bestModule = getBestModule();
   elements.statBestModule.textContent = bestModule || "--";
+  updateAccuracyRing(accuracy);
+  renderSessionTrend();
+  renderBestModuleSpark();
   renderModuleStats();
   renderHistory();
 }
@@ -764,6 +774,7 @@ function renderModuleStats() {
         <h4>${module}</h4>
         <div class="hint">Accuracy: ${entry.accuracy}%</div>
         <div class="hint">Attempts: ${entry.attempts}</div>
+        <div class="bar"><span style="width: ${entry.accuracy}%"></span></div>
       `;
       elements.moduleStats.appendChild(card);
     });
@@ -813,6 +824,51 @@ function renderHistory() {
     `;
     elements.historyList.appendChild(item);
   });
+}
+
+function updateAccuracyRing(value) {
+  const circumference = 2 * Math.PI * 46;
+  const offset = circumference - (value / 100) * circumference;
+  elements.ringAccuracy.style.strokeDasharray = String(circumference);
+  elements.ringAccuracy.style.strokeDashoffset = String(offset);
+  elements.ringValue.textContent = `${value}%`;
+}
+
+function renderSessionTrend() {
+  const lastSeven = getSessionsByDay(7);
+  elements.sessionTrend.innerHTML = "";
+  lastSeven.forEach((count) => {
+    const bar = document.createElement("div");
+    bar.className = "micro-bar";
+    const height = Math.max(6, Math.min(44, count * 8));
+    bar.style.height = `${height}px`;
+    elements.sessionTrend.appendChild(bar);
+  });
+}
+
+function renderBestModuleSpark() {
+  const stats = getModuleStats();
+  const entries = Object.entries(stats).sort((a, b) => b[1].accuracy - a[1].accuracy);
+  elements.bestModuleSpark.innerHTML = "";
+  const top = entries.slice(0, 6);
+  top.forEach((entry, index) => {
+    const dot = document.createElement("span");
+    if (index === 0) dot.classList.add("active");
+    elements.bestModuleSpark.appendChild(dot);
+  });
+}
+
+function getSessionsByDay(days) {
+  const now = new Date();
+  const buckets = Array.from({ length: days }, () => 0);
+  state.history.forEach((session) => {
+    const date = new Date(session.startedAt);
+    const diff = Math.floor((now - date) / (24 * 60 * 60 * 1000));
+    if (diff >= 0 && diff < days) {
+      buckets[days - diff - 1] += 1;
+    }
+  });
+  return buckets;
 }
 
 function setupReminder() {
