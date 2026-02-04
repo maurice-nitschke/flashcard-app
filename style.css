@@ -608,7 +608,7 @@ textarea {
 .exam-bars .bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(120deg, var(--teal), #5bc9b6);
+  background: linear-gradient(120deg, var(--accent), #46e4bf);
 }
 
 .exam-wrong-list {
@@ -1052,6 +1052,16 @@ textarea {
   .exam-quicklinks {
     background: rgba(15, 21, 32, 0.95);
     border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .exam-module-breakdown .module-card,
+  .exam-wrong-item {
+    background: #0f1520;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .exam-bars .bar {
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .exam-option.correct {
