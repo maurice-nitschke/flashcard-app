@@ -22,6 +22,7 @@
           <p class="subtitle">Fast recall training with spaced repetition and smart modes.</p>
         </div>
         <div class="top-actions">
+          <a class="ghost" href="dashboard.html">Dashboard view</a>
           <button class="ghost" id="loadSample">Load sample</button>
           <button class="ghost" id="resetProgress">Reset progress</button>
         </div>
@@ -41,54 +42,6 @@
             <p>Paste the question JSON and load instantly.</p>
             <textarea id="jsonInput" spellcheck="false"></textarea>
             <button id="importPaste" class="primary">Import pasted JSON</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel" id="dashboardPanel">
-        <div class="panel-title">Learning Dashboard</div>
-        <div class="dashboard-grid">
-          <div class="dash-card highlight">
-            <div>
-              <p class="stat-label">Total reviewed</p>
-              <p class="stat-value" id="statReviewed">0</p>
-              <p class="hint">All answer attempts across modes.</p>
-            </div>
-            <div class="ring">
-              <svg viewBox="0 0 120 120">
-                <circle class="ring-track" cx="60" cy="60" r="46"></circle>
-                <circle class="ring-bar" id="ringAccuracy" cx="60" cy="60" r="46"></circle>
-              </svg>
-              <div class="ring-label">
-                <span id="ringValue">0%</span>
-                <small>Accuracy</small>
-              </div>
-            </div>
-          </div>
-          <div class="dash-card">
-            <p class="stat-label">Sessions</p>
-            <p class="stat-value" id="statSessions">0</p>
-            <p class="hint">Training sessions logged.</p>
-            <div class="micro-chart" id="sessionTrend"></div>
-          </div>
-          <div class="dash-card">
-            <p class="stat-label">Best module</p>
-            <p class="stat-value" id="statBestModule">--</p>
-            <p class="hint">Highest accuracy.</p>
-            <div class="spark" id="bestModuleSpark"></div>
-          </div>
-        </div>
-        <div class="dashboard-split">
-          <div>
-            <p class="stat-label">Module performance</p>
-            <div class="module-stats" id="moduleStats"></div>
-          </div>
-          <div>
-            <div class="history-header">
-              <p class="stat-label">Training history</p>
-              <button class="ghost" id="clearHistory">Clear history</button>
-            </div>
-            <div id="historyList" class="history-list"></div>
           </div>
         </div>
       </section>

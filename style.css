@@ -94,6 +94,10 @@ input[type="file"] {
   color: var(--ink);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ghost:hover {

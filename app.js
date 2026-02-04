@@ -246,6 +246,7 @@ function buildModules() {
 }
 
 function renderModules() {
+  if (!elements.moduleSelect) return;
   elements.moduleSelect.innerHTML = "";
   state.modules.forEach((module) => {
     const option = document.createElement("option");
@@ -260,9 +261,15 @@ function renderModules() {
 
 function setPanels() {
   const hasQuestions = state.questions.length > 0;
-  elements.trainerPanel.style.display = hasQuestions ? "block" : "none";
-  elements.dashboardPanel.style.display = hasQuestions ? "block" : "none";
-  elements.importPanel.style.display = hasQuestions ? "none" : "block";
+  if (elements.trainerPanel) {
+    elements.trainerPanel.style.display = hasQuestions ? "block" : "none";
+  }
+  if (elements.dashboardPanel) {
+    elements.dashboardPanel.style.display = hasQuestions ? "block" : "none";
+  }
+  if (elements.importPanel) {
+    elements.importPanel.style.display = hasQuestions ? "none" : "block";
+  }
 }
 
 function getStats(questionId) {
@@ -335,19 +342,19 @@ function getDueCount() {
 }
 
 function renderStats() {
-  elements.statTotal.textContent = state.questions.length;
-  elements.statDue.textContent = getDueCount();
+  if (elements.statTotal) elements.statTotal.textContent = state.questions.length;
+  if (elements.statDue) elements.statDue.textContent = getDueCount();
   const accuracy = getAccuracy();
-  elements.statAccuracy.textContent = `${accuracy}%`;
-  elements.statReviewed.textContent = getTotalReviewed();
-  elements.statSessions.textContent = state.history.length;
+  if (elements.statAccuracy) elements.statAccuracy.textContent = `${accuracy}%`;
+  if (elements.statReviewed) elements.statReviewed.textContent = getTotalReviewed();
+  if (elements.statSessions) elements.statSessions.textContent = state.history.length;
   const bestModule = getBestModule();
-  elements.statBestModule.textContent = bestModule || "--";
-  updateAccuracyRing(accuracy);
-  renderSessionTrend();
-  renderBestModuleSpark();
-  renderModuleStats();
-  renderHistory();
+  if (elements.statBestModule) elements.statBestModule.textContent = bestModule || "--";
+  if (elements.ringAccuracy && elements.ringValue) updateAccuracyRing(accuracy);
+  if (elements.sessionTrend) renderSessionTrend();
+  if (elements.bestModuleSpark) renderBestModuleSpark();
+  if (elements.moduleStats) renderModuleStats();
+  if (elements.historyList) renderHistory();
 }
 
 function shuffle(list) {
@@ -445,6 +452,7 @@ function updateProgress(questionId) {
 }
 
 function renderQuestion() {
+  if (!elements.questionText || !elements.answers) return;
   const pool = buildPool();
   if (!pool.length) {
     elements.questionText.textContent = "No questions in this mode yet.";
@@ -459,9 +467,9 @@ function renderQuestion() {
 
   const question = state.current;
   elements.questionText.textContent = question.question;
-  elements.modulePill.textContent = question.module;
-  elements.feedback.textContent = "";
-  elements.nextBtn.textContent = "Next";
+  if (elements.modulePill) elements.modulePill.textContent = question.module;
+  if (elements.feedback) elements.feedback.textContent = "";
+  if (elements.nextBtn) elements.nextBtn.textContent = "Next";
 
   const answers = state.shuffle ? shuffle(question.answers) : question.answers;
   elements.answers.innerHTML = "";
@@ -478,13 +486,16 @@ function renderQuestion() {
     state.mode !== "random" && state.module !== "All Modules"
       ? pool
       : state.questions;
-  elements.counter.textContent = state.micro.active
-    ? `${state.micro.remaining} cards left`
-    : `${modulePool.length} cards`;
+  if (elements.counter) {
+    elements.counter.textContent = state.micro.active
+      ? `${state.micro.remaining} cards left`
+      : `${modulePool.length} cards`;
+  }
   updateProgress(question.questionId);
 }
 
 function lockAnswers() {
+  if (!elements.answers) return;
   Array.from(elements.answers.children).forEach((button) => {
     button.classList.add("disabled");
     button.disabled = true;
@@ -492,6 +503,7 @@ function lockAnswers() {
 }
 
 function revealCorrect() {
+  if (!elements.answers) return;
   const correctId = state.current.correctAnswerId;
   if (!correctId) return;
   Array.from(elements.answers.children).forEach((button) => {
@@ -508,7 +520,9 @@ function handleAnswer(button) {
   const correctId = state.current.correctAnswerId;
   state.attemptCount += 1;
   if (!correctId) {
-    elements.feedback.textContent = "No correct answer set for this card.";
+    if (elements.feedback) {
+      elements.feedback.textContent = "No correct answer set for this card.";
+    }
     lockAnswers();
     return;
   }
@@ -518,10 +532,12 @@ function handleAnswer(button) {
     button.classList.add("correct");
     const result = state.attemptCount === 1 ? "correct_first" : "correct_second";
     applyResult(result);
-    elements.feedback.textContent =
-      result === "correct_first"
-        ? "Correct on the first try."
-        : "Correct on the second try.";
+    if (elements.feedback) {
+      elements.feedback.textContent =
+        result === "correct_first"
+          ? "Correct on the first try."
+          : "Correct on the second try.";
+    }
     revealCorrect();
     lockAnswers();
     if (state.autoNext && !state.sprint.active) {
@@ -532,7 +548,9 @@ function handleAnswer(button) {
 
   button.classList.add("incorrect");
   if (state.attemptMode === "second" && state.attemptCount === 1) {
-    elements.feedback.textContent = "Not quite. One more try.";
+    if (elements.feedback) {
+      elements.feedback.textContent = "Not quite. One more try.";
+    }
     button.disabled = true;
     button.classList.add("disabled");
     return;
@@ -541,7 +559,9 @@ function handleAnswer(button) {
   applyResult("wrong");
   revealCorrect();
   lockAnswers();
-  elements.feedback.textContent = "Wrong answer. The correct one is highlighted.";
+  if (elements.feedback) {
+    elements.feedback.textContent = "Wrong answer. The correct one is highlighted.";
+  }
 }
 
 function applyResult(result) {
@@ -571,7 +591,9 @@ function applyResult(result) {
     state.micro.remaining = Math.max(0, state.micro.remaining - 1);
     if (state.micro.remaining === 0) {
       state.micro.active = false;
-      elements.feedback.textContent = `Microlearning done: ${state.micro.correct} correct out of ${state.micro.total}.`;
+      if (elements.feedback) {
+        elements.feedback.textContent = `Microlearning done: ${state.micro.correct} correct out of ${state.micro.total}.`;
+      }
     }
   }
 }
@@ -588,114 +610,144 @@ function importQuestions(raw) {
   renderQuestion();
 }
 
-elements.importFile.addEventListener("click", async () => {
-  const file = elements.fileInput.files?.[0];
-  if (!file) return;
-  const text = await file.text();
-  try {
-    importQuestions(JSON.parse(text));
-  } catch (error) {
-    elements.feedback.textContent = "Invalid JSON file.";
-  }
-});
+if (elements.importFile) {
+  elements.importFile.addEventListener("click", async () => {
+    const file = elements.fileInput?.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    try {
+      importQuestions(JSON.parse(text));
+    } catch (error) {
+      if (elements.feedback) elements.feedback.textContent = "Invalid JSON file.";
+    }
+  });
+}
 
-elements.importPaste.addEventListener("click", () => {
-  try {
-    const parsed = JSON.parse(elements.jsonInput.value);
-    importQuestions(parsed);
-  } catch (error) {
-    elements.feedback.textContent = "Invalid JSON pasted.";
-  }
-});
+if (elements.importPaste) {
+  elements.importPaste.addEventListener("click", () => {
+    try {
+      const parsed = JSON.parse(elements.jsonInput.value);
+      importQuestions(parsed);
+    } catch (error) {
+      if (elements.feedback) elements.feedback.textContent = "Invalid JSON pasted.";
+    }
+  });
+}
 
-elements.loadSample.addEventListener("click", () => {
-  elements.jsonInput.value = JSON.stringify(SAMPLE_DATA, null, 2);
-  importQuestions(SAMPLE_DATA);
-});
+if (elements.loadSample) {
+  elements.loadSample.addEventListener("click", () => {
+    if (elements.jsonInput) {
+      elements.jsonInput.value = JSON.stringify(SAMPLE_DATA, null, 2);
+    }
+    importQuestions(SAMPLE_DATA);
+  });
+}
 
-elements.resetProgress.addEventListener("click", () => {
-  state.stats = {};
-  saveStats();
-  renderStats();
-  if (state.current) updateProgress(state.current.questionId);
-});
+if (elements.resetProgress) {
+  elements.resetProgress.addEventListener("click", () => {
+    state.stats = {};
+    saveStats();
+    renderStats();
+    if (state.current) updateProgress(state.current.questionId);
+  });
+}
 
-elements.clearHistory.addEventListener("click", () => {
-  state.history = [];
-  saveHistory();
-  renderStats();
-});
-
-elements.modeSelect.addEventListener("change", (event) => {
-  state.mode = event.target.value;
-  saveSettings();
-  if (state.mode === "sprint") {
-    setSprint(true);
-  } else {
-    setSprint(false);
-  }
-  renderQuestion();
-});
-
-elements.moduleSelect.addEventListener("change", (event) => {
-  state.module = event.target.value;
-  saveSettings();
-  renderQuestion();
-});
-
-elements.segmentedButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    state.attemptMode = button.dataset.attempt;
-    elements.segmentedButtons.forEach((btn) =>
-      btn.classList.toggle("active", btn === button)
-    );
-    saveSettings();
+if (elements.clearHistory) {
+  elements.clearHistory.addEventListener("click", () => {
+    state.history = [];
+    saveHistory();
     renderStats();
   });
-});
+}
 
-elements.shuffleToggle.addEventListener("change", (event) => {
-  state.shuffle = event.target.checked;
-  saveSettings();
-  renderQuestion();
-});
-
-elements.autoNextToggle.addEventListener("change", (event) => {
-  state.autoNext = event.target.checked;
-  saveSettings();
-});
-
-elements.nextBtn.addEventListener("click", () => {
-  if (state.mode === "sprint" && !state.sprint.active) {
-    setSprint(true);
-  }
-  renderQuestion();
-});
-
-elements.startMicro.addEventListener("click", () => {
-  state.micro.active = true;
-  state.micro.remaining = 20;
-  state.micro.correct = 0;
-  state.micro.total = 0;
-  renderQuestion();
-});
-
-elements.notifyToggle.addEventListener("change", async (event) => {
-  state.reminder.enabled = event.target.checked;
-  saveSettings();
-  if (state.reminder.enabled && "Notification" in window) {
-    if (Notification.permission !== "granted") {
-      await Notification.requestPermission();
+if (elements.modeSelect) {
+  elements.modeSelect.addEventListener("change", (event) => {
+    state.mode = event.target.value;
+    saveSettings();
+    if (state.mode === "sprint") {
+      setSprint(true);
+    } else {
+      setSprint(false);
     }
-  }
-  setupReminder();
-});
+    renderQuestion();
+  });
+}
 
-elements.notifyInterval.addEventListener("change", (event) => {
-  state.reminder.interval = Number(event.target.value);
-  saveSettings();
-  setupReminder();
-});
+if (elements.moduleSelect) {
+  elements.moduleSelect.addEventListener("change", (event) => {
+    state.module = event.target.value;
+    saveSettings();
+    renderQuestion();
+  });
+}
+
+if (elements.segmentedButtons.length) {
+  elements.segmentedButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      state.attemptMode = button.dataset.attempt;
+      elements.segmentedButtons.forEach((btn) =>
+        btn.classList.toggle("active", btn === button)
+      );
+      saveSettings();
+      renderStats();
+    });
+  });
+}
+
+if (elements.shuffleToggle) {
+  elements.shuffleToggle.addEventListener("change", (event) => {
+    state.shuffle = event.target.checked;
+    saveSettings();
+    renderQuestion();
+  });
+}
+
+if (elements.autoNextToggle) {
+  elements.autoNextToggle.addEventListener("change", (event) => {
+    state.autoNext = event.target.checked;
+    saveSettings();
+  });
+}
+
+if (elements.nextBtn) {
+  elements.nextBtn.addEventListener("click", () => {
+    if (state.mode === "sprint" && !state.sprint.active) {
+      setSprint(true);
+    }
+    renderQuestion();
+  });
+}
+
+if (elements.startMicro) {
+  elements.startMicro.addEventListener("click", () => {
+    state.micro.active = true;
+    state.micro.remaining = 20;
+    state.micro.correct = 0;
+    state.micro.total = 0;
+    renderQuestion();
+  });
+}
+
+if (elements.notifyToggle) {
+  elements.notifyToggle.addEventListener("change", async (event) => {
+    state.reminder.enabled = event.target.checked;
+    saveSettings();
+    if (state.reminder.enabled && "Notification" in window) {
+      if (Notification.permission !== "granted") {
+        await Notification.requestPermission();
+      }
+    }
+    setupReminder();
+  });
+}
+
+if (elements.notifyInterval) {
+  elements.notifyInterval.addEventListener("change", (event) => {
+    state.reminder.interval = Number(event.target.value);
+    saveSettings();
+    setupReminder();
+  });
+}
 
 function init() {
   loadFromStorage();
@@ -703,14 +755,18 @@ function init() {
   renderModules();
   setPanels();
   renderStats();
-  elements.modeSelect.value = state.mode;
-  elements.shuffleToggle.checked = state.shuffle;
-  elements.autoNextToggle.checked = state.autoNext;
-  elements.notifyToggle.checked = state.reminder.enabled;
-  elements.notifyInterval.value = String(state.reminder.interval);
-  elements.segmentedButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.attempt === state.attemptMode);
-  });
+  if (elements.modeSelect) elements.modeSelect.value = state.mode;
+  if (elements.shuffleToggle) elements.shuffleToggle.checked = state.shuffle;
+  if (elements.autoNextToggle) elements.autoNextToggle.checked = state.autoNext;
+  if (elements.notifyToggle) elements.notifyToggle.checked = state.reminder.enabled;
+  if (elements.notifyInterval) {
+    elements.notifyInterval.value = String(state.reminder.interval);
+  }
+  if (elements.segmentedButtons.length) {
+    elements.segmentedButtons.forEach((button) => {
+      button.classList.toggle("active", button.dataset.attempt === state.attemptMode);
+    });
+  }
   if (state.mode === "sprint") setSprint(true);
   setupReminder();
   if (state.questions.length) renderQuestion();
@@ -827,6 +883,7 @@ function renderHistory() {
 }
 
 function updateAccuracyRing(value) {
+  if (!elements.ringAccuracy || !elements.ringValue) return;
   const circumference = 2 * Math.PI * 46;
   const offset = circumference - (value / 100) * circumference;
   elements.ringAccuracy.style.strokeDasharray = String(circumference);
@@ -835,6 +892,7 @@ function updateAccuracyRing(value) {
 }
 
 function renderSessionTrend() {
+  if (!elements.sessionTrend) return;
   const lastSeven = getSessionsByDay(7);
   elements.sessionTrend.innerHTML = "";
   lastSeven.forEach((count) => {
@@ -847,6 +905,7 @@ function renderSessionTrend() {
 }
 
 function renderBestModuleSpark() {
+  if (!elements.bestModuleSpark) return;
   const stats = getModuleStats();
   const entries = Object.entries(stats).sort((a, b) => b[1].accuracy - a[1].accuracy);
   elements.bestModuleSpark.innerHTML = "";
