@@ -955,9 +955,38 @@ function init() {
   setupReminder();
   if (state.questions.length) renderQuestion();
   if (elements.examPanel) initExam();
+  setupKeyboardShortcuts();
 }
 
 init();
+
+function setupKeyboardShortcuts() {
+  if (!elements.answers || !elements.nextBtn) return;
+  document.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.tagName === "BUTTON" ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+    if (!state.current) return;
+    if (event.key === "ArrowRight") {
+      elements.nextBtn.click();
+      return;
+    }
+    if (/^[1-9]$/.test(event.key)) {
+      const index = Number(event.key) - 1;
+      const buttons = Array.from(elements.answers.querySelectorAll(".answer"));
+      const button = buttons[index];
+      if (button) button.click();
+    }
+  });
+}
 
 function getTotalReviewed() {
   return Object.values(state.stats).reduce((sum, entry) => {
